@@ -5,17 +5,25 @@ export default function Home() {
   const [drivers, setDrivers] = useState([]);
   const [races, setRaces] = useState([]);
   const [result, setResult] = useState(null);
+  const [loadingOptions, setLoadingOptions] = useState(false);
 
-  useEffect(() => {
-    if (form.year) {
-      fetch(`/api/options?year=${form.year}`)
-        .then(res => res.json())
-        .then(data => {
-          setDrivers(data.drivers || []);
-          setRaces(data.races || []);
-        });
+  const handleYearChange = (e) => {
+    setForm({ ...form, year: e.target.value });
+  };
+
+  const handleLoadOptions = async () => {
+    if (!form.year) return;
+    setLoadingOptions(true);
+    try {
+      const res = await fetch(`/api/options?year=${form.year}`);
+      const data = await res.json();
+      setDrivers(data.drivers || []);
+      setRaces(data.races || []);
+    } catch (err) {
+      console.error("Failed to load options", err);
     }
-  }, [form.year]);
+    setLoadingOptions(false);
+  };
 
   const handleChange = e => {
     setForm({ ...form, [e.target.name]: e.target.value });
@@ -38,7 +46,19 @@ export default function Home() {
 
       <form onSubmit={handleSubmit}>
         <label>Year:</label>
-        <input type="text" name="year" value={form.year} onChange={handleChange} placeholder="e.g., 2023" /><br /><br />
+        <input
+          type="text"
+          name="year"
+          value={form.year}
+          onChange={handleYearChange}
+          placeholder="e.g., 2023"
+        />
+        <button type="button" onClick={handleLoadOptions} style={{ marginLeft: 10 }}>
+          🔄 Load Races & Drivers
+        </button>
+        <br /><br />
+
+        {loadingOptions && <p>⏳ Loading races and drivers...</p>}
 
         <label>Driver:</label>
         <select name="driver" value={form.driver} onChange={handleChange}>
