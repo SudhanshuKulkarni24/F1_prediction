@@ -1,7 +1,4 @@
 fastapi
-uvicorn
-joblib
-catboost
-pydantic
 numpy
-scikit-learn
+requests
+pydantic
