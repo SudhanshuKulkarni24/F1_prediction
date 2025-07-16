@@ -1,3 +1,7 @@
 fastapi
-requests
+uvicorn
 fastf1
+pandas
+catboost
+scikit-learn
+python-multipart
