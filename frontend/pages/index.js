@@ -1,104 +1,69 @@
-import { useState, useEffect } from "react";
+import { useEffect, useState } from 'react';
 
 export default function Home() {
-  const [form, setForm] = useState({
-    year: "",
-    race: "",
-    driver: ""
-  });
-
+  const [form, setForm] = useState({ year: '', driver: '', race: '' });
   const [drivers, setDrivers] = useState([]);
   const [races, setRaces] = useState([]);
   const [result, setResult] = useState(null);
-  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     if (form.year) {
       fetch(`/api/options?year=${form.year}`)
-        .then((res) => res.json())
-        .then((data) => {
-          setRaces(data.races || []);
+        .then(res => res.json())
+        .then(data => {
           setDrivers(data.drivers || []);
-        })
-        .catch((err) => console.error("Error fetching options:", err));
+          setRaces(data.races || []);
+        });
     }
   }, [form.year]);
 
-  const handleSubmit = async (e) => {
+  const handleChange = e => {
+    setForm({ ...form, [e.target.name]: e.target.value });
+  };
+
+  const handleSubmit = async e => {
     e.preventDefault();
-    setLoading(true);
-    setResult(null);
-    try {
-      const res = await fetch("/api/predict", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify(form)
-      });
-      const data = await res.json();
-      setResult(data);
-    } catch (err) {
-      console.error("Prediction error:", err);
-      setResult({ error: "Failed to predict" });
-    }
-    setLoading(false);
+    const res = await fetch('/api/predict', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(form)
+    });
+    const data = await res.json();
+    setResult(data);
   };
 
   return (
-    <main style={{ padding: "2rem", fontFamily: "Arial, sans-serif" }}>
-      <h1>🏎️ F1 Race Outcome Predictor</h1>
+    <main style={{ padding: 20, fontFamily: 'Arial' }}>
+      <h1>🏎️ F1 Finish Predictor</h1>
+
       <form onSubmit={handleSubmit}>
-        <label>Year:</label><br />
-        <input
-          type="text"
-          placeholder="e.g. 2024"
-          value={form.year}
-          onChange={(e) => setForm({ ...form, year: e.target.value })}
-        />
-        <br /><br />
+        <label>Year:</label>
+        <input type="text" name="year" value={form.year} onChange={handleChange} placeholder="e.g., 2023" /><br /><br />
 
-        <label>Race Name:</label><br />
-        <select
-          value={form.race}
-          onChange={(e) => setForm({ ...form, race: e.target.value })}
-        >
-          <option value="">--Select Race--</option>
-          {races.map((r) => (
-            <option key={r} value={r}>{r}</option>
-          ))}
-        </select>
-        <br /><br />
+        <label>Driver:</label>
+        <select name="driver" value={form.driver} onChange={handleChange}>
+          <option value="">Select Driver</option>
+          {drivers.map(d => <option key={d}>{d}</option>)}
+        </select><br /><br />
 
-        <label>Driver:</label><br />
-        <select
-          value={form.driver}
-          onChange={(e) => setForm({ ...form, driver: e.target.value })}
-        >
-          <option value="">--Select Driver--</option>
-          {drivers.map((d) => (
-            <option key={d} value={d}>{d}</option>
-          ))}
-        </select>
-        <br /><br />
+        <label>Race:</label>
+        <select name="race" value={form.race} onChange={handleChange}>
+          <option value="">Select Race</option>
+          {races.map(r => <option key={r}>{r}</option>)}
+        </select><br /><br />
 
-        <button type="submit" disabled={loading}>
-          {loading ? "Predicting..." : "Predict"}
-        </button>
+        <button type="submit">🔮 Predict</button>
       </form>
 
       {result && (
-        <div style={{ marginTop: "2rem" }}>
-          <h3>📊 Prediction Results:</h3>
-          {result.error ? (
-            <p style={{ color: "red" }}>{result.error}</p>
-          ) : (
-            <ul>
-              <li><strong>Top 1 Probability:</strong> {(result.top1 * 100).toFixed(2)}%</li>
-              <li><strong>Top 3 Probability:</strong> {(result.top3 * 100).toFixed(2)}%</li>
-              <li><strong>Top 5 Probability:</strong> {(result.top5 * 100).toFixed(2)}%</li>
-            </ul>
-          )}
+        <div style={{ marginTop: 20 }}>
+          <h2>📊 Prediction:</h2>
+          <p><strong>Driver:</strong> {result.driver}</p>
+          <p><strong>Race:</strong> {result.race}</p>
+          <p><strong>Year:</strong> {result.year}</p>
+          <p><strong>Top 1 Finish Probability:</strong> {result.Top1}</p>
+          <p><strong>Top 3 Finish Probability:</strong> {result.Top3}</p>
+          <p><strong>Top 5 Finish Probability:</strong> {result.Top5}</p>
         </div>
       )}
     </main>
