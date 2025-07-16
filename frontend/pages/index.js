@@ -1,67 +1,68 @@
 import { useState, useEffect } from "react";
 
 export default function Home() {
-  const [years, setYears] = useState([]);
-  const [races, setRaces] = useState([]);
+  const [form, setForm] = useState({
+    year: "",
+    race: "",
+    driver: ""
+  });
+
   const [drivers, setDrivers] = useState([]);
-  const [form, setForm] = useState({ year: "", race: "", driver: "" });
+  const [races, setRaces] = useState([]);
   const [result, setResult] = useState(null);
-  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  // Fetch options on load
-  useEffect(() => {
-    fetch("/api/options")
-      .then((r) => r.json())
-      .then((data) => {
-        setYears(data.years);
-        setDrivers(data.drivers);
-      })
-      .catch(() => { /* ignore */ });
-  }, []);
-
-  // When year changes, load races for that year
   useEffect(() => {
     if (form.year) {
       fetch(`/api/options?year=${form.year}`)
-        .then((r) => r.json())
-        .then((data) => setRaces(data.races))
-        .catch(() => { /* ignore */ });
+        .then((res) => res.json())
+        .then((data) => {
+          setRaces(data.races || []);
+          setDrivers(data.drivers || []);
+        })
+        .catch((err) => console.error("Error fetching options:", err));
     }
   }, [form.year]);
 
-  const onSubmit = async (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    setError("");
+    setLoading(true);
     setResult(null);
     try {
       const res = await fetch("/api/predict", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(form)
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.detail || "Prediction failed");
       setResult(data);
     } catch (err) {
-      setError(err.message);
+      console.error("Prediction error:", err);
+      setResult({ error: "Failed to predict" });
     }
+    setLoading(false);
   };
 
   return (
-    <div style={{ padding: "2rem", fontFamily: "Arial, sans-serif", maxWidth: 400, margin: "auto" }}>
-      <h1>🏎️ F1 Race Predictor</h1>
-      <form onSubmit={onSubmit}>
-        <label>Year: </label>
-        <select value={form.year} onChange={(e) => setForm({ ...form, year: e.target.value })}>
-          <option value="">--Select Year--</option>
-          {years.map((y) => (
-            <option key={y} value={y}>{y}</option>
-          ))}
-        </select>
+    <main style={{ padding: "2rem", fontFamily: "Arial, sans-serif" }}>
+      <h1>🏎️ F1 Race Outcome Predictor</h1>
+      <form onSubmit={handleSubmit}>
+        <label>Year:</label><br />
+        <input
+          type="text"
+          placeholder="e.g. 2024"
+          value={form.year}
+          onChange={(e) => setForm({ ...form, year: e.target.value })}
+        />
         <br /><br />
 
-        <label>Race: </label>
-        <select value={form.race} onChange={(e) => setForm({ ...form, race: e.target.value })}>
+        <label>Race Name:</label><br />
+        <select
+          value={form.race}
+          onChange={(e) => setForm({ ...form, race: e.target.value })}
+        >
           <option value="">--Select Race--</option>
           {races.map((r) => (
             <option key={r} value={r}>{r}</option>
@@ -69,8 +70,11 @@ export default function Home() {
         </select>
         <br /><br />
 
-        <label>Driver: </label>
-        <select value={form.driver} onChange={(e) => setForm({ ...form, driver: e.target.value })}>
+        <label>Driver:</label><br />
+        <select
+          value={form.driver}
+          onChange={(e) => setForm({ ...form, driver: e.target.value })}
+        >
           <option value="">--Select Driver--</option>
           {drivers.map((d) => (
             <option key={d} value={d}>{d}</option>
@@ -78,21 +82,25 @@ export default function Home() {
         </select>
         <br /><br />
 
-        <button type="submit">Predict</button>
+        <button type="submit" disabled={loading}>
+          {loading ? "Predicting..." : "Predict"}
+        </button>
       </form>
 
-      {error && <p style={{ color: "red" }}>Error: {error}</p>}
       {result && (
         <div style={{ marginTop: "2rem" }}>
-          <h2>Prediction Results</h2>
-          <p>Top 1 Chance: {(result.top1_prob * 100).toFixed(2)}%</p>
-          <p>Top 3 Chance: {(result.top3_prob * 100).toFixed(2)}%</p>
-          <p>Top 5 Chance: {(result.top5_prob * 100).toFixed(2)}%</p>
-          {result.predicted_position !== undefined && (
-            <p>Predicted Position: {result.predicted_position.toFixed(1)}</p>
+          <h3>📊 Prediction Results:</h3>
+          {result.error ? (
+            <p style={{ color: "red" }}>{result.error}</p>
+          ) : (
+            <ul>
+              <li><strong>Top 1 Probability:</strong> {(result.top1 * 100).toFixed(2)}%</li>
+              <li><strong>Top 3 Probability:</strong> {(result.top3 * 100).toFixed(2)}%</li>
+              <li><strong>Top 5 Probability:</strong> {(result.top5 * 100).toFixed(2)}%</li>
+            </ul>
           )}
         </div>
       )}
-    </div>
+    </main>
   );
 }
