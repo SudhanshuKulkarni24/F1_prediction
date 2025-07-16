@@ -1,35 +1,53 @@
 from fastapi import FastAPI, Query
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 import fastf1
 import os
 import joblib
-import json
 
 app = FastAPI()
-app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
-# Enable FastF1 cache (Vercel will allow small temp dir usage)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"], allow_methods=["*"], allow_headers=["*"]
+)
+
+# ✅ Use a Vercel-friendly cache path
 fastf1.Cache.enable_cache("/tmp/fastf1_cache")
 
-# Load encoder
-enc_path = os.path.join(os.path.dirname(__file__), '..', 'models', 'encoders.pkl')
-enc = {}
-try:
-    enc = joblib.load(enc_path)
-except Exception as e:
-    print(f"[ERROR] Failed to load encoder: {e}")
 
 @app.get("/api/options")
-def get_options(year: int = Query(...)):
-    print(f"[DEBUG] Received options request for year = {year}")
-    drivers = sorted(enc.get("drivers", {}).keys())
-    races = []
-
+async def get_options(year: int = Query(...)):
     try:
-        schedule = fastf1.get_event_schedule(year)
-        races = schedule["EventName"].dropna().unique().tolist()
-        print(f"[DEBUG] Fetched {len(races)} races")
+        print(f"🔧 Received request for year: {year}")
+
+        # ✅ Load encoders
+        enc_path = os.path.join(os.path.dirname(__file__), "..", "models", "encoders.pkl")
+        enc_path = os.path.abspath(enc_path)
+        print(f"🔍 Loading encoder from: {enc_path}")
+
+        if not os.path.exists(enc_path):
+            raise FileNotFoundError(f"encoders.pkl not found at {enc_path}")
+
+        enc = joblib.load(enc_path)
+        driver_map = enc.get("drivers", {})
+        drivers = sorted(driver_map.keys())
+        print(f"✅ Loaded {len(drivers)} drivers")
+
+        # ✅ Load event schedule
+        try:
+            schedule = fastf1.get_event_schedule(year)
+            races = schedule["EventName"].dropna().unique().tolist()
+            print(f"✅ Loaded {len(races)} races for {year}")
+        except Exception as e:
+            print(f"[⚠️ Schedule Error] {e}")
+            races = []
+
+        return JSONResponse(content={"drivers": drivers, "races": races})
+
     except Exception as e:
-        print(f"[ERROR] Failed to load race schedule: {e}")
-    
-    return {"drivers": drivers, "races": races}
+        print(f"[❌ OPTIONS API ERROR] {e}")
+        return JSONResponse(
+            content={"error": "Internal Server Error", "details": str(e)},
+            status_code=500
+        )
