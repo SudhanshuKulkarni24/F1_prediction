@@ -1,4 +1,5 @@
 fastapi
-numpy
+uvicorn
 requests
+numpy
 pydantic
