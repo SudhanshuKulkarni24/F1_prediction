@@ -1,40 +1,30 @@
-import joblib
-from fastapi import FastAPI, Request
-from fastapi.responses import JSONResponse
-from pydantic import BaseModel
-import numpy as np
+import pickle
+import requests
+import os
 
-app = FastAPI()
+CATBOOST_MODEL_URL = "https://raw.githubusercontent.com/SudhanshuKulkarni24/F1_prediction/main/models/catboost_model.pkl"
+ENCODERS_URL = "https://raw.githubusercontent.com/SudhanshuKulkarni24/F1_prediction/main/models/encoders.pkl"
 
-# Load model and encoder
-model = joblib.load("models/catboost_model.pkl")
-encoder = joblib.load("models/encoders.pkl")
+def download_file(url, filename):
+    if not os.path.exists(filename):
+        print(f"🔽 Downloading {filename}...")
+        r = requests.get(url)
+        r.raise_for_status()
+        with open(filename, 'wb') as f:
+            f.write(r.content)
+        print(f"✅ Downloaded {filename}")
 
-class PredictRequest(BaseModel):
-    driver: str
-    avg_lap_time: float
-    fastest_lap: float
+# Download and cache model files
+download_file(CATBOOST_MODEL_URL, "catboost_model.pkl")
+download_file(ENCODERS_URL, "encoders.pkl")
 
-@app.post("/api/predict")
-async def predict(req: PredictRequest):
-    driver = req.driver
-    avg_lap = req.avg_lap_time
-    fast_lap = req.fastest_lap
+# Load the models
+with open("catboost_model.pkl", "rb") as f:
+    model = pickle.load(f)
 
-    if driver not in encoder["drivers"]:
-        return JSONResponse(status_code=400, content={"error": "Unknown driver"})
+with open("encoders.pkl", "rb") as f:
+    encoders = pickle.load(f)
 
-    driver_encoded = encoder["drivers"][driver]
-    team_encoded = 0  # Assuming team is not present
-
-    X = np.array([[driver_encoded, team_encoded, avg_lap, fast_lap]])
-
-    probs = model.predict_proba(X)
-    final_pos = model.predict(X)[0]
-
-    return {
-        "Top1_prob": float(probs[0][1]),
-        "Top3_prob": float(min(probs[0][1] + 0.2, 1.0)),
-        "Top5_prob": float(min(probs[0][1] + 0.4, 1.0)),
-        "FinalPos": int(final_pos)
-    }
+# Unpack encoders
+le_driver = encoders["driver"]
+le_race = encoders["race"]
